@@ -1,0 +1,11 @@
+Revision history for Perl extension File::FlexSort.
+
+0.01  Sun Oct 21 14:30:16 2001
+	- original version; created by h2xs 1.21 with options
+		-Xn File::FlexSort
+
+0.50  Fri Oct 26 18:42:20 2001
+	- almost ready for prime-time.
+
+0.75  Sat Oct 26 2:33:20 2001
+	- now handles compressed files
