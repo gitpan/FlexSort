@@ -46,10 +46,11 @@ sub new {
 	my $files_ref = shift;		# ref to array of files.
 	my $index_ref = shift;		# ref to sub that will extract index value from line
 	my $comp_ref = shift;		# ref to sub used to compare index values
-							#	currently this is not used.
+								#	currently this is not used.
 
 	### CREATE SKELETON OBJECT  
-	my $self = { 	index => $index_ref,
+	my $self = { 	
+				index => $index_ref,
 				comparison => $comp_ref,
 				num_files => 0
 	};
@@ -67,7 +68,7 @@ sub new {
 			$self->{num_files} = $self->{num_files} + 1;	 	# Increase Count of open files
 			
 			# Get line and index for each file.
-			$self->{files}->[$n]->{line} = &get_line($fh);	
+			$self->{files}->[$n]->{line}  = &get_line($fh);	
 			$self->{files}->[$n]->{index} = &get_index($self->{files}->[$n]->{line}, $self->{index});
 			$n++;
 
@@ -92,7 +93,7 @@ sub new {
 
 
 	$n=0;
-	foreach my $index (sort {$shash{$a} <=> $shash{$b}} keys %shash) {
+	foreach my $index ( sort { $shash{$a} <=> $shash{$b} } keys %shash ) {
 		$self->{sorted}->[$n] = $self->{files}->[$index];
 		$n++;
 	}
@@ -165,7 +166,6 @@ sub get_index {
 sub next_line {
 
 	### Main method.  This returns the next line from the stack.
-	###
 	
 	my $self = shift;
 
@@ -178,7 +178,7 @@ sub next_line {
 	# Re-populate LOW VALUE, i.e. $self->{sorted}->[0]
 	if ( my $newline = get_line($self->{sorted}->[0]->{fh}) ) {
 		$self->{sorted}->[0]->{line} = $newline;
-		$self->{sorted}->[0]->{index} = get_index($newline, $self->{index});
+		$self->{sorted}->[0]->{index} = get_index( $newline, $self->{index} );
 	} else {
 		shift @{$self->{sorted}};
 		$self->{num_files}--;
@@ -211,6 +211,39 @@ sub next_line {
 }
 
 
+sub dump {
+	
+	# Dump the contents of the file to either STDOUT or FILE.
+	# Default: <STDOUT>
+
+	my $self = shift;
+	my $file = shift;
+	my $line;
+
+	
+
+	if ($file) {
+		open( FILE, ">$file" );
+		
+		while ( $line = $self->next_line ) {
+			print FILE "$line\n";
+		}
+
+		close FILE;
+	
+	} else {
+
+		while ( $line = $self->next_line ) {
+			print "$line\n";
+		}
+			
+	}
+
+}
+	
+
+	
+
 
 # Autoload methods go after =cut, and are processed by the autosplit program.
 
@@ -227,51 +260,67 @@ __END__
 
 =head1 NAME
 
-File::FlexSort - Perl extension for sorting distributed, ordered files
+File::FlexSort - Perl extension for merging and processing data 
+distributed over ordered files.
 
 =head1 SYNOPSIS
 
+File::FlexSort provides an easy way to merge, parse, process and analyze data
+that exists in many files with an existing order.  Because flex sort takes 
+advantages of the existing order, the processing should be both quick and frugal
+with memory resources.
+
+
   use File::FlexSort;
   
-  my $sort = new PeopleLink::Sort(\@file_list, \&index_extract_function, [\&comparison_function]));
+  my $sort = new File::FlexSort( 
+                \@file_list,             # Anonymous array of path/files 
+                \&index_extract_function 
+  );
 
-  my $line = $sort->next_line;
+
+  my $line = $sort->next_line;  # Retrieves the next line for porcessing
   print "$line\n";
+
+  $sort->dump( [file] ); 	# Dumps remaining records in sorted order
+                          # to a file.            Default: <STDOUT>
 
 
 =head1 DESCRIPTION
 
-File::FlexSort is a simple solution for returning ordered data which has been
-that is distributed among several ordered files.  An example might be applic-
-ation server logs which record events from a computing cluster.  FlexSort is
-an easy way to merge / parse / analyze files in this situation.  It was built
-with the usual PERLish thoughts ... ease, intuition, FLEXIBLITY and speed.  
+File::FlexSort is a hopefully straight forward solution for situations where one 
+wishes to merge data files with all ready ordered records. An example might 
+application server logs which record events chronilogically from a cluster.  If we 
+want to examine, process or merge several files but retain the chronological order,
+then flexsort is for you.
 
 Here's how it works ...
 
-As arguments, FlexSort takes a reference to an array of filepaths/names and a 
-reference to a subroutine.  The files are the targets of the sort objects and 
-the with the subroutine determining the sorting sort order.  When passed a line 
-(i.e. a scalar) from one of the files, the user supplied subroutine must return
-a numeric index / key value associated with that line.  This value determines 
-the sort order of the files.  The files with the 
+As arguments, FlexSort takes a reference to an anonymous array of filepaths/names 
+and a reference to a subroutine that extracts an index value.  The anonymous array
+of the filenames are the files to be sorted with the subroutine determining the
+sort order. When passed a line (i.e. a scalar) from one of the files, the user 
+supplied subroutine must return a numeric index value associated with the line.  
+The records are then culled in ascending based on the index values.  In the future, 
+File::FlexSort will likely become more flexible to live up to it's name.
 
 More detail ...
 
-For each file FlexSort opens a IO::File or IO::Zlib object.  It then examines the
-first line of each file and uses the subroutine to extracting an index associated 
-with the line.  It creates a stack based on these values sorted by these values.  
+For each file FlexSort opens a IO::File or IO::Zlib object.  ( FS handles mixed 
+compressed and uncompressed files seamlessly by detecting for files with .z or .gz 
+extensions. )  Initially the first line is indexed acording to the subroutine.  A 
+stack is created based on these values.  
 
-When 'next_line' is called, FlexSort returns the line with the lowest index value.  
-FlexSort then replenishes the stack, reads a new line from the corresponding file 
-and places it in the proper position for the next call to 'next_line'.
+When the function 'next_line' is called, FlexSort returns the line with the lowest 
+index value.  FlexSort then replenishes the stack, reads a new line from the 
+corresponding file and places it in the proper position for the next call to 
+'next_line'.
 
 Additional Notes: 
-- By default a single file is read until its index is no longer the lowest value.
+- A stable sort is implemented, i.e. a single file is read until its index is no longer the lowest value. 
 - If the file ends in .z or .gz then the file is opened with IO::Zlib, instead.
 
  
-
 =head1 EXAMPLE
 
    # This program does looks at files found 
@@ -279,51 +328,58 @@ Additional Notes:
    # files sorted by the date  in mm/dd/yyyy
    # format
 
-   use File::Recurse;
-   use File::FlexSort;
+  use File::Recurse;
+  use File::FlexSort;
 
-   recurse { push(@files, $_) } "/logfiles";
+  recurse { push(@files, $_) } "/logfiles";
 
-   my $fs = new File::FlexSort(\@files, \&index_sub);
+  my $fs = new File::FlexSort(\@files, \&index_sub);
 	
-   while (my $line = $fs->next_line) {
-   		.
-		.	some operations on $line
-		.
-   }
+  while (my $line = $fs->next_line) {
+    .
+	.	some operations on $line
+	.
+  }
 
 
-   sub index_sub{
+  sub index_sub{
 
-      # Use this to extract a date of
-      # the form mm-dd-yyyy.
+    # Use this to extract a date of
+    # the form mm-dd-yyyy.
 	 
-      my $line = shift;
+    my $line = shift;
 
-	 # Be cautious that only the date will be
-	 # extracted. 
-	 $line =~ /(\d{2})-(\d{2})-(\d{4})/;
-	 
-	 return "$3$1$2";		# Index is an interger, yyyymmdd
-						# lower number will be read first.
+    # Be cautious that only the date will be
+    # extracted. 
+    $line =~ /(\d{2})-(\d{2})-(\d{4})/;
+ 
+    return "$3$1$2";  # Index is an interger, yyyymmdd
+                      # Lower number will be read first.
 
-   }	
+  }	
 	
 
 =head1 TODO
 
-	Install a generic comparison function rather than relying on <.
+	Implement a generic test/comparison function to replace text/numeric comparison.
+	Implement a configurable record seperator.
+	Allow for optional deletion of duplicate entries.
 
-=head2 EXPORT
+
+=head1 EXPORT
 
 None by default.
 
 
 =head1 AUTHOR
 
-Chris Brown, E<lt>chris.brown@alum.calberkeley.edu<gt>
+Chris Brown, E<lt>chris.brown@cal.berkeley.edu<gt>
 
-Copyright(c) 2001 Christopher Brown.  All rights reserved.  This program is free software; you can redistribute it and/or modify it under the terms of the License, distributed with PERL or until I say otherwise.  Not intended for evil purposes.  Yadda, yadda, yadda ...
+Copyright(c) 2002 Christopher Brown.  All rights reserved.  
+This program is free software; you can redistribute it and/or modify it under 
+the terms of the License, distributed with PERL.  Not intended for evil purposes.  
+Yadda, yadda, yadda ...
+
 
 =head1 SEE ALSO
 

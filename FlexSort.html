@@ -1,0 +1,150 @@
+<HTML>
+<HEAD>
+<TITLE>File::FlexSort - Perl extension for merging and processing data 
+distributed over ordered files.</TITLE>
+<LINK REV="made" HREF="mailto:">
+</HEAD>
+
+<BODY>
+
+<A NAME="__index__"></A>
+<!-- INDEX BEGIN -->
+
+<UL>
+
+	<LI><A HREF="#name">NAME</A></LI>
+	<LI><A HREF="#synopsis">SYNOPSIS</A></LI>
+	<LI><A HREF="#description">DESCRIPTION</A></LI>
+	<LI><A HREF="#todo">TODO</A></LI>
+	<LI><A HREF="#export">EXPORT</A></LI>
+	<LI><A HREF="#author">AUTHOR</A></LI>
+	<LI><A HREF="#see also">SEE ALSO</A></LI>
+</UL>
+<!-- INDEX END -->
+
+<HR>
+<P>
+<H1><A NAME="name">NAME</A></H1>
+<P>File::FlexSort - Perl extension for merging and processing data 
+distributed over ordered files.</P>
+<P>
+<HR>
+<H1><A NAME="synopsis">SYNOPSIS</A></H1>
+<P>File::FlexSort provides an easy way to merge, parse, process and analyze data
+that exists in many files with an existing order.  Because flex sort takes 
+advantages of the existing order, the processing should be both quick and frugal
+with memory resources.</P>
+<PRE>
+  use File::FlexSort;
+</PRE>
+<PRE>
+
+  my $sort = new File::FlexSort( 
+                \@file_list,             # Anonymous array of path/files 
+                \&amp;index_extract_function 
+  );</PRE>
+<PRE>
+  my $line = $sort-&gt;next_line;  # Retrieves the next line for porcessing
+  print &quot;$line\n&quot;;</PRE>
+<PRE>
+  $sort-&gt;dump( [file] );        # Dumps remaining records in sorted order
+                          # to a file.            Default: &lt;STDOUT&gt;</PRE>
+<P>
+<HR>
+<H1><A NAME="description">DESCRIPTION</A></H1>
+<P>File::FlexSort is a hopefully straight forward solution for situations where one 
+wishes to merge data files with all ready ordered records. An example might 
+application server logs which record events chronilogically from a cluster.  If we 
+want to examine, process or merge several files but retain the chronological order,
+then flexsort is for you.</P>
+<P>Here's how it works ...</P>
+<P>As arguments, FlexSort takes a reference to an anonymous array of filepaths/names 
+and a reference to a subroutine that extracts an index value.  The anonymous array
+of the filenames are the files to be sorted with the subroutine determining the
+sort order. When passed a line (i.e. a scalar) from one of the files, the user 
+supplied subroutine must return a numeric index value associated with the line.  
+The records are then culled in ascending based on the index values.  In the future, 
+File::FlexSort will likely become more flexible to live up to it's name.</P>
+<P>More detail ...</P>
+<P>For each file FlexSort opens a IO::File or IO::Zlib object.  ( FS handles mixed 
+compressed and uncompressed files seamlessly by detecting for files with .z or .gz 
+extensions. )  Initially the first line is indexed acording to the subroutine.  A 
+stack is created based on these values.</P>
+<P>When the function 'next_line' is called, FlexSort returns the line with the lowest 
+index value.  FlexSort then replenishes the stack, reads a new line from the 
+corresponding file and places it in the proper position for the next call to 
+'next_line'.</P>
+<P>Additional Notes: 
+- A stable sort is implemented, i.e. a single file is read until its index is no longer the lowest value. 
+- If the file ends in .z or .gz then the file is opened with IO::Zlib, instead.</P>
+<P></P>
+<PRE>
+
+=head1 EXAMPLE</PRE>
+<PRE>
+   # This program does looks at files found 
+   # in /logfiles, returns the records of the
+   # files sorted by the date  in mm/dd/yyyy
+   # format</PRE>
+<PRE>
+  use File::Recurse;
+  use File::FlexSort;</PRE>
+<PRE>
+  recurse { push(@files, $_) } &quot;/logfiles&quot;;</PRE>
+<PRE>
+  my $fs = new File::FlexSort(\@files, \&amp;index_sub);
+</PRE>
+<PRE>
+
+  while (my $line = $fs-&gt;next_line) {
+    .
+        .       some operations on $line
+        .
+  }</PRE>
+<PRE>
+  sub index_sub{</PRE>
+<PRE>
+    # Use this to extract a date of
+    # the form mm-dd-yyyy.
+</PRE>
+<PRE>
+
+    my $line = shift;</PRE>
+<PRE>
+    # Be cautious that only the date will be
+    # extracted. 
+    $line =~ /(\d{2})-(\d{2})-(\d{4})/;
+</PRE>
+<PRE>
+
+    return &quot;$3$1$2&quot;;  # Index is an interger, yyyymmdd
+                      # Lower number will be read first.</PRE>
+<PRE>
+  }</PRE>
+<P>
+<HR>
+<H1><A NAME="todo">TODO</A></H1>
+<PRE>
+        Implement a generic test/comparison function to replace text/numeric comparison.
+        Implement a configurable record seperator.
+        Allow for optional deletion of duplicate entries.</PRE>
+<P>
+<HR>
+<H1><A NAME="export">EXPORT</A></H1>
+<P>None by default.</P>
+<P>
+<HR>
+<H1><A NAME="author">AUTHOR</A></H1>
+<P>Chris Brown, &lt;<A HREF="mailto:chris.brown@cal.berkeley.edu<gt>">chris.brown@cal.berkeley.edu<gt></A></P>
+<P><CODE>Copyright(c)</CODE> 2002 Christopher Brown.  All rights reserved.  
+This program is free software; you can redistribute it and/or modify it under 
+the terms of the License, distributed with PERL.  Not intended for evil purposes.  
+Yadda, yadda, yadda ...</P>
+<P>
+<HR>
+<H1><A NAME="see also">SEE ALSO</A></H1>
+<P><EM>perl</EM>. <A HREF="/IO/File.html">the IO::File manpage</A>. <A HREF="/IO/Zlib.html">the IO::Zlib manpage</A>.  <A HREF="/Compress/Zlib.html">the Compress::Zlib manpage</A>.</P>
+
+</BODY>
+
+</HTML>
